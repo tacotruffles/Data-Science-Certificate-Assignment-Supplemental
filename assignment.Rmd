@@ -22,13 +22,122 @@ library("lvplot")
 
 
 Explore the distribution of each of the `x`, `y`, and `z` variables in `diamonds`. What do you learn?
-Think about a diamond and how you might decide which dimension is the length, width, and depth.
 
+Get the summary of x, y, z
 ```{r}
-
+summary(select(diamonds, x, y, z))
 ```
 
+Plot the distributions of each
+```{r}
+ggplot(diamonds) +
+  geom_histogram(aes(x = x), binwidth = .2)
+```
 
+```{r}
+ggplot(diamonds) +
+  geom_histogram(aes(x = y), binwidth = .2)
+```
+
+```{r}
+ggplot(diamonds) +
+  geom_histogram(aes(x = z), binwidth = .2)
+```
+Summary: 
+
+1. x and y contains values are larger with IQR between 4.7 and 6.5
+2. while z has IQR between 2.9 and 4.0
+
+Observations:
+1. There some outliers in the x, y, z variables which cause skewing to the right
+2. There are spikes in the plots, as opposed to a smooth distribution, which suggests multi-modal data.
+3. The outliers are either 0 or have extreme values (data entry errors?).
+
+Investigate the outliers:
+```{r}
+filter(diamonds, x == 0 | y == 0 | z == 0)
+```
+
+1. The values with `z` as 0 would be flat, which makes no sense for how diamonds are cut.
+
+```{r}
+diamonds %>%
+  arrange(desc(x)) %>%
+  head()
+```
+
+1. Other than the 0 in the low end...the high end of values appears normal for `x`
+
+```{r}
+diamonds %>%
+  arrange(desc(y)) %>%
+  head()
+```
+
+1. In the high end of values, `y` has a couple of large outlier values of `58.9` and `31.8`
+
+```{r}
+diamonds %>%
+  arrange(desc(z)) %>%
+  head()
+```
+
+1. In the high end of values, `z` has  a single outlier values of `31.8`
+
+Let's plot some comparisons to the x, y, and z values to see how the outliers affect distributions
+```{r}
+ggplot(diamonds, aes(x = x, y = y)) +
+  geom_point()
+```
+
+```{r}
+ggplot(diamonds, aes(x = x, y = z)) +
+  geom_point()
+```
+
+```{r}
+ggplot(diamonds, aes(x = y, y = z)) +
+  geom_point()
+```
+
+Let's remove the outliers to see if the relationships make more sense
+```{r}
+diamonds %>%
+filter(x > 0, x <= 10) %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = x), binwidth = .01) +
+  scale_x_continuous(breaks=1:10)
+```
+
+```{r}
+diamonds %>%
+filter(y > 0, y <= 10) %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = y), binwidth = .01) +
+  scale_x_continuous(breaks=1:10)
+```
+
+```{r}
+diamonds %>%
+filter(z > 0, z <= 10) %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = z), binwidth = .01) +
+  scale_x_continuous(breaks=1:10)
+```
+
+Think about a diamond and how you might decide which dimension is the length, width, and depth.
+```{r}
+?diamonds
+```
+
+Docs say that 
+1. x = length, y = width, z = depth
+2. However there's also a `depth` percentage column where it's expressed as:
+z / mean(x,y)
+
+```{r}
+????
+```
 
 ### Exercise 7.3.2 
 
@@ -36,10 +145,34 @@ Think about a diamond and how you might decide which dimension is the length, wi
 Explore the distribution of price. Do you discover anything unusual or surprising? (Hint: Carefully think about the `binwidth` and make sure you try a wide range of values.)
 
 ```{r}
+summary(select(diamonds, price))
+```
+More diamonds are being sold around `$2400`. 
 
+```{r}
+diamonds %>%
+  filter(price < 2400) %>%
+  ggplot() +
+  geom_histogram(aes(x = price),binwidth = 10)
 ```
 
+```{r}
+diamonds %>%
+  filter(price < 2400) %>%
+  ggplot() +
+  geom_histogram(aes(x = price),binwidth = 25)
+```
 
+```{r}
+diamonds %>%
+  filter(price < 2400) %>%
+  ggplot() +
+  geom_histogram(aes(x = price),binwidth = 100)
+```
+There's also a large drop in qty in sales of diamonds in the data around `$1500`
+
+
+??? Distribution of last digit?
 
 
 ### Exercise 7.3.3 
@@ -49,21 +182,46 @@ How many are 1 carat?
 What do you think is the cause of the difference?
 
 ```{r}
+diamonds %>%
+  filter(carat == .99) %>%
+  count(carat)
+```
+`23` diamonds are .99 carat.
 
+```{r}
+diamonds %>%
+  filter(carat == 1.0) %>%
+  count(carat)
+```
+`1558` diamonds are 1 carat.
+
+I'm not a diamond cutter but perhaps the 1 carat diamond is a more disarable cut, or perhaps the .99 where diamonds that has a problem during the cut that required further correction that reduced the weight (carat size) of the diamond?
+
+```{r}
+diamonds %>%
+  filter(carat >= 0.9, carat <= 1.1) %>%
+  count(carat) %>%
+  print(n = Inf)
 ```
 
-
-
-
+## Covariation 
 
 #### Exercise 7.5.1.1 
 
 Use what you've learned to improve the visualization of the departure times of cancelled vs. non-cancelled flights.
 
 ```{r}
-flights = nycflights13::flights 
+flights = nycflights13::flights
 
-
+flights %>%
+  mutate(
+    cancelled = is.na(dep_time), # x = T/F was cancelled
+    hour_dep = sched_dep_time %/% 100,
+    min_dep = sched_dep_time %% 100,
+    sched_dep_time = hour_dep + min_dep / 60 # y = convert time to real number
+  ) %>%
+  ggplot() +
+    geom_boxplot(aes(x=cancelled,y=sched_dep_time))
 ```
 
 
@@ -72,10 +230,41 @@ flights = nycflights13::flights
 
 What are the general relationships of each variable with the price of the diamonds?
 
+Carat vs. Price (Continuous variables)
 ```{r}
-
+diamonds %>%
+ggplot() +
+  geom_point(aes(x = carat, y=price))
 ```
 
+```{r}
+ggplot(data = diamonds, mapping = aes(x = carat, y = price)) +
+  geom_boxplot(mapping = aes(group = cut_width(carat, 0.1)))
+```
+
+Color vs Clarity (Boxploting discrete variables)
+Use fct_rev to order from worst color to best. (J down to D)
+Plost will show weak negative relationship between price and color
+```{r}
+diamonds %>%
+  mutate(color = fct_rev(color)) %>%
+  ggplot(aes(x = color, y = price)) +
+  geom_boxplot()
+```
+
+Carity vs Price (Boxplot discrete vs continuous variables)
+Contiuous variable already ordered from worst to best clarity ()
+```{r}
+ggplot(data = diamonds) +
+  geom_boxplot(mapping = aes(x = clarity, y = price))
+
+# not sure how IF sorts after all other values beginning with S anvd V
+# I would think I1, IF, then .... for ascending order
+diamonds %>%
+  group_by(clarity) %>%
+  summarize(n = n()) %>%
+  arrange(clarity)
+```
 
 
 #### Exercise 7.5.1.4 
@@ -86,13 +275,18 @@ Install the lvplot package, and try using `geom_lv()` to display the distributio
 
 An example of the plot is shown below (`geom_lv`). Write answers (not code) to answer these questions:
 What do you learn?
+????
 
 How do you interpret the plots?
+????
 
 
 ```{r}
 ggplot(diamonds, aes(x = cut, y = price)) +
   geom_lv()
+
+ggplot(diamonds, aes(x = cut, y = price)) +
+  geom_boxplot()
 ```
 
 
@@ -103,8 +297,37 @@ Use `geom_tile()` together with dplyr to explore how average flight delays vary 
 What makes the plot difficult to read?
 How could you improve it?
 
+Terrible plot:
 ```{r}
+flights %>%
+  group_by(month, dest) %>%
+  summarise(dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
+  ggplot(aes(x = factor(month), y = dest, fill = dep_delay)) +
+  geom_tile() +
+  labs(x = "Month", y = "Destination", fill = "Departure Delay")
+```
 
+Futher filtering and grouping to mangle data:
+1. Remove NAs
+2. Remove departure delays more than 15 mins.
+```{r}
+flights %>%
+  
+  group_by(month, dest) %>%
+  summarise(dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
+  # group by destintation aagin to get number of dests each month
+  group_by(dest) %>%
+  # only get destinations that have flights in each month of the year
+  filter(n() == 12) %>%
+  #summarize(n = n())
+  # Put back to previous grouped dataframe
+  ungroup() %>% 
+  # dplyr recorder destination by the 2 values in dest (itself) and then by avg dep_delay
+  mutate(dest = reorder(dest, dep_delay)) %>%
+  # plot month with factor to categorize value, fill color is affected by dep_delay
+  ggplot(aes(x = factor(month), y = dest, fill = dep_delay)) +
+  geom_tile() +
+  labs(x = "Month", y = "Destination", fill = "Departure Delay")
 ```
 
 
@@ -114,8 +337,21 @@ How could you improve it?
 
 Visualize the distribution of `carat`, partitioned by `price`.
 
+We need to "convert" `price` to a discrete values (binned) so that it can be compared against the discrete values of `carat`
 ```{r}
+# split price into 10 bins and flip for better readability
+ggplot(diamonds, aes(x = cut_number(price, 10), y = carat)) +
+  geom_boxplot() +
+  coord_flip() +
+  xlab("Price")
+```
 
+```{r}
+# split price into increments of $2000
+ggplot(diamonds, aes(x = cut_width(price, 2000, boundary = 0), y = carat)) +
+  geom_boxplot(varwidth = TRUE) +
+  coord_flip() +
+  xlab("Price")
 ```
 
 
@@ -125,7 +361,6 @@ Visualize the distribution of `carat`, partitioned by `price`.
 How does the price distribution of very large diamonds compare to small diamonds.
 Is it as you expect, or does it surprise you?
 
-```{r}
+I don't know much about diamonds but I can see in the chart that the price varies more as the diamonds get bigger, espcially over 2 carats.
 
-```
 
